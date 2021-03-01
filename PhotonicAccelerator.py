@@ -47,8 +47,8 @@ class PhotonicAccelerator:
         self.fft_convs = 0
         
         ###### TODO: REPLACE WITH FLEXIBLE MEMORY HIERARCHY SUPERCLASS
-        self.kernel_buffer = MemObj(1, "../cacti", "cache.cfg")
-        self.object_buffer = MemObj(2, "../cacti", "cache.cfg")
+        self.kernel_buffer = MemObj(1, "../cacti", "eDRAM-32MB.cfg")
+        self.object_buffer = MemObj(2, "../cacti", "eDRAM-64MB.cfg")
         #self.resid_buffer = MemObj("../cacti", "cache.cfg")
         self.mem_access_width = 1e3
         # Instantiate digital subsys
