@@ -84,6 +84,9 @@ class PhotonicAccelerator:
         print("Digital energy = {}".format(digital_energy))
         print("Object buffer energy = {}".format(obj_energy))
         print("Kernel buffer energy = {}".format(kern_energy))
+
+        print("Total energy = {}".format(photonic_energy + digital_energy + obj_energy + kern_energy))
+        print("Avg power = {}".format((photonic_energy + digital_energy + obj_energy + kern_energy) / total_latency))
         
         return
     
