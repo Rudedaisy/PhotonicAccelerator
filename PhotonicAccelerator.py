@@ -20,17 +20,18 @@ class PhotonicAccelerator:
         - Implement updated control flow
         """
 
+        # Constants
+        self.MS_dim = 1e3
+        self.MS_pix = self.MS_dim * self.MS_dim
+        
         # Default layer stats
         self.in_obj_size = 1024
         self.out_obj_size = 256
         self.in_channels = 3
         self.out_channels = 64
         self.kernel_size = 9
-        self.kernels_per_map = 1 ##
-        
-        # Constants
-        self.MS_dim = 1e3
-        self.MS_pix = self.MS_dim * self.MS_dim
+        self.channels_per_map = min(self.MS_pix // self.in_obj_size, self.MS_pix // self.kernel_size)
+        self.filters_per_map = 1 
         
         # Registers for Finite-state-machine
         self.cycle = 0
@@ -66,7 +67,10 @@ class PhotonicAccelerator:
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = kernel_size
-        self.kernels_per_map = 1 ##
+
+        self.channels_per_map = min(self.MS_pix // in_obj_size, self.MS_pix // kernel_size)
+        # prefer to limit 1 filter at a time --> directly accumulate partial sums
+        self.filters_per_map = 1
         return
 
     def compute_stats(self):
@@ -74,7 +78,7 @@ class PhotonicAccelerator:
         WORK IN PROGRESS
         """
         total_latency = self.critical_path_latency * self.cycle
-        photonic_energy = self.fft_convs * self.photonic.E
+        photonic_energy = self.fft_convs * self.photonic.E 
         digital_energy = total_latency * self.digital.avgPower
         obj_energy = (self.obj_reads * self.object_buffer.read_energy) + (self.obj_writes * self.object_buffer.write_energy) + (total_latency * self.object_buffer.static_power)
         kern_energy = (self.kern_reads * self.kernel_buffer.read_energy) + (total_latency * self.kernel_buffer.static_power)
@@ -188,30 +192,31 @@ class PhotonicAccelerator:
         # 1
         elif self.state == 1:
             if self.read_ready:
-                self.obj_reads += self.mem_access_width//self.in_obj_size
+                self.obj_reads += self.mem_access_width//(self.in_obj_size*self.channels_per_map)
             return
         # 2
         elif self.state == 2:
             self.fft_convs += 1
-            self.curr_in_channel += 1
+            self.curr_in_channel += self.channels_per_map
             self.curr_out_channel = 0
             if self.read_ready:
-                self.kern_reads += self.mem_access_width//(self.kernel_size*self.kernels_per_map)
+                self.kern_reads += self.mem_access_width//(self.kernel_size*self.channels_per_map*self.filters_per_map)
             return
         # 3
         elif self.state == 3:
             if self.read_ready:
-                self.kern_reads += self.mem_access_width//(self.kernel_size*self.kernels_per_map)
+                self.kern_reads += self.mem_access_width//(self.kernel_size*self.channels_per_map*self.filters_per_map)
             return
         # 4
         elif self.state == 4:
-            self.fft_convs += 1
-            self.obj_writes += self.mem_access_width//self.out_obj_size
-            self.curr_out_channel += self.kernels_per_map
+            # 2 fft_convs to compensate for complex number computation
+            self.fft_convs += 2
+            self.obj_writes += self.mem_access_width//(self.out_obj_size*self.filters_per_map)
+            self.curr_out_channel += self.filters_per_map
             if self.read_ready and self.curr_out_channel < self.out_channels:
-                self.kern_reads += self.mem_access_width//(self.kernel_size*self.kernels_per_map)
+                self.kern_reads += self.mem_access_width//(self.kernel_size*self.channels_per_map*self.filters_per_map)
             if self.read_ready and self.curr_out_channel >= self.out_channels:
-                self.obj_reads += self.mem_access_width//self.in_obj_size
+                self.obj_reads += self.mem_access_width//(self.in_obj_size*self.channels_per_map)
             return
         # 5
         elif self.state == 5:
