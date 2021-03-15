@@ -42,7 +42,7 @@ class MemObj:
                 self.read_energy = float(line.split(':')[1].strip()) * 1e-9
             elif ("Total dynamic write energy per access (nJ):" in line) or ("Write Energy (nJ):" in line):
                 self.write_energy = float(line.split(':')[1].strip()) * 1e-9
-            elif ("Total leakage power of a bank (mW):" in line) or ("Leakage Power Open Page (mW):" in line):
+            elif ("Total leakage power of a bank (mW):" in line) or ("Leakage Power I/O (mW):" in line): #("Leakage Power Open Page (mW):" in line):
                 self.static_power = float(line.split(':')[1].strip()) * 1e-3
             elif "Data array: Area (mm2):" in line:
                 self.area = float(line.split(':')[2].strip())

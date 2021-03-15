@@ -7,6 +7,7 @@ Desc:     Complete description of photonic accelerator system
 from PhotonicSubsys import PhotonicSubsys
 from DigitalSubsys import DigitalSubsys
 from MemObj import MemObj
+import math
 
 class PhotonicAccelerator:
 
@@ -48,18 +49,33 @@ class PhotonicAccelerator:
         self.fft_convs = 0
         
         ###### TODO: REPLACE WITH FLEXIBLE MEMORY HIERARCHY SUPERCLASS
-        self.kernel_buffer = MemObj(1, "../cacti", "eDRAM-32MB.cfg")
-        self.object_buffer = MemObj(2, "../cacti", "eDRAM-64MB.cfg")
+        self.kernel_buffer = MemObj(1, "../cacti", "eDRAM-32MB-25w.cfg")
+        self.object_buffer = MemObj(2, "../cacti", "eDRAM-64MB-25w.cfg")
         #self.resid_buffer = MemObj("../cacti", "cache.cfg")
-        self.mem_access_width = 1e3
+        self.mem_access_width = 16
+        self.banks = 1024
         # Instantiate digital subsys
         self.digital = DigitalSubsys(MS_dim=self.MS_dim, DAC_group_size=1, ADC_group_size=1)
         # Instantiate photonic subsys
         self.photonic = PhotonicSubsys(MS_pix=self.MS_pix, Nb=8)
 
         # Determine critical path latency
-        self.critical_path_latency = max(self.photonic.t, self.digital.latency, self.kernel_buffer.latency, self.object_buffer.latency)
+        self.critical_path_latency = max(self.photonic.t, self.digital.latency, self.kernel_buffer.latency*self.MS_pix/self.mem_access_width/self.banks, self.object_buffer.latency*self.MS_pix/self.mem_access_width/self.banks)
         print("Critical path = {}".format(self.critical_path_latency))
+
+        # Lifetime summary variables
+        self.total_latency = []
+        self.total_cycle = []
+        self.photonic_energy = []
+        self.digital_energy = []
+        self.obj_energy = []
+        self.kern_energy = []
+        self.total_fft_convs = []
+        self.layerwise_MS_util = []
+        # buffer width inefficiency
+        self.obj_inef = []
+        self.obj_write_inef = []
+        self.kern_inef = []
         
     def load_layer(self, in_obj_size, out_obj_size, in_channels, out_channels, kernel_size):
         self.in_obj_size = in_obj_size
@@ -68,9 +84,10 @@ class PhotonicAccelerator:
         self.out_channels = out_channels
         self.kernel_size = kernel_size
 
-        self.channels_per_map = min(self.MS_pix // in_obj_size, self.MS_pix // kernel_size)
+        self.channels_per_map = min(min(self.MS_pix // in_obj_size, self.MS_pix // kernel_size), self.in_channels)
         # prefer to limit 1 filter at a time --> directly accumulate partial sums
         self.filters_per_map = 1
+
         return
 
     def compute_stats(self):
@@ -83,17 +100,47 @@ class PhotonicAccelerator:
         obj_energy = (self.obj_reads * self.object_buffer.read_energy) + (self.obj_writes * self.object_buffer.write_energy) + (total_latency * self.object_buffer.static_power)
         kern_energy = (self.kern_reads * self.kernel_buffer.read_energy) + (total_latency * self.kernel_buffer.static_power)
 
-        print("Total latency = {}".format(total_latency))
-        print("Photonic energy = {}".format(photonic_energy))
-        print("Digital energy = {}".format(digital_energy))
-        print("Object buffer energy = {}".format(obj_energy))
-        print("Kernel buffer energy = {}".format(kern_energy))
+        self.total_latency.append(total_latency)
+        self.total_cycle.append(self.cycle)
+        self.photonic_energy.append(photonic_energy)
+        self.digital_energy.append(digital_energy)
+        self.obj_energy.append(obj_energy)
+        self.kern_energy.append(kern_energy)
+        self.total_fft_convs.append(self.fft_convs)
+        self.layerwise_MS_util.append(float(self.in_obj_size * self.channels_per_map) / self.MS_pix)
+        
+        print("Total latency \t\t= {}".format(total_latency))
+        print("Photonic energy \t= {}".format(photonic_energy))
+        print("Digital energy \t\t= {}".format(digital_energy))
+        print("Object buffer energy \t= {}".format(obj_energy))
+        print("Kernel buffer energy \t= {}".format(kern_energy))
 
-        print("Total energy = {}".format(photonic_energy + digital_energy + obj_energy + kern_energy))
-        print("Avg power = {}".format((photonic_energy + digital_energy + obj_energy + kern_energy) / total_latency))
+        print("Total energy \t\t= {}".format(photonic_energy + digital_energy + obj_energy + kern_energy))
+        print("Avg power \t\t= {}".format((photonic_energy + digital_energy + obj_energy + kern_energy) / total_latency))
         
         return
-    
+
+    def summary(self):
+        """ Print lifetime summary """
+        print(" --- Total Summary --- ")
+        print("CNN latency: \t\t{} s".format(sum(self.total_latency)))
+        print("CNN cycle count: \t{}".format(sum(self.total_cycle)))
+        total_energy = sum(self.photonic_energy) + sum(self.digital_energy) + sum(self.obj_energy) + sum(self.kern_energy)
+        print("Total energy: \t\t{} J".format(total_energy))
+        print("\tPhotonic: \t{:%}".format(sum(self.photonic_energy) / total_energy))
+        print("\tDigital: \t{:%}".format(sum(self.digital_energy) / total_energy))
+        print("\tObj buffer: \t{:%}\tRead inefficiency: \t{}\tWrite ineffciency: \t{}".format(sum(self.obj_energy) / total_energy, sum(self.obj_inef) / len(self.obj_inef), sum(self.obj_write_inef) / len(self.obj_write_inef)))
+        print("\tKern buffer: \t{:%}\tRead inefficiency: \t{}".format(sum(self.kern_energy) / total_energy, sum(self.kern_inef) / len(self.kern_inef)))
+        print("Average power: \t\t{} W".format(total_energy / sum(self.total_latency)))
+        print("Energy efficiency: \t{} imgs/J".format(1 / total_energy))
+
+        scaled_util = [self.layerwise_MS_util[i]*self.total_fft_convs[i] / sum(self.total_fft_convs) for i in range(len(self.layerwise_MS_util))]
+        print("Avg utilization: {}".format(sum(scaled_util)))
+
+        print(" --------------------- ")
+
+        return self.total_cycle
+        
     def update_state(self, start=False):
         """
         Finite-state-machine
@@ -192,31 +239,37 @@ class PhotonicAccelerator:
         # 1
         elif self.state == 1:
             if self.read_ready:
-                self.obj_reads += self.mem_access_width//(self.in_obj_size*self.channels_per_map)
+                self.obj_reads += math.ceil(float(self.in_obj_size*self.channels_per_map) / self.mem_access_width)
+                self.obj_inef.append(float(math.ceil(float(self.in_obj_size*self.channels_per_map) / self.mem_access_width)) / (float(self.in_obj_size*self.channels_per_map) / self.mem_access_width))
             return
         # 2
         elif self.state == 2:
-            self.fft_convs += 1
+            self.fft_convs += 2
             self.curr_in_channel += self.channels_per_map
             self.curr_out_channel = 0
             if self.read_ready:
-                self.kern_reads += self.mem_access_width//(self.kernel_size*self.channels_per_map*self.filters_per_map)
+                self.kern_reads += math.ceil(float(self.kernel_size*self.channels_per_map*self.filters_per_map)/self.mem_access_width)
+                self.kern_inef.append(float(math.ceil(float(self.kernel_size*self.channels_per_map*self.filters_per_map)/self.mem_access_width)) / (float(self.kernel_size*self.channels_per_map*self.filters_per_map)/self.mem_access_width))
             return
         # 3
         elif self.state == 3:
             if self.read_ready:
-                self.kern_reads += self.mem_access_width//(self.kernel_size*self.channels_per_map*self.filters_per_map)
+                self.kern_reads += math.ceil(float(self.kernel_size*self.channels_per_map*self.filters_per_map)/self.mem_access_width)
+                self.kern_inef.append(float(math.ceil(float(self.kernel_size*self.channels_per_map*self.filters_per_map)/self.mem_access_width)) / (float(self.kernel_size*self.channels_per_map*self.filters_per_map)/self.mem_access_width))
             return
         # 4
         elif self.state == 4:
             # 2 fft_convs to compensate for complex number computation
             self.fft_convs += 2
-            self.obj_writes += self.mem_access_width//(self.out_obj_size*self.filters_per_map)
+            self.obj_writes += math.ceil(float(self.out_obj_size*self.filters_per_map) / self.mem_access_width)
+            self.obj_write_inef.append(float(math.ceil(float(self.out_obj_size*self.filters_per_map) / self.mem_access_width)) / (float(self.out_obj_size*self.filters_per_map) / self.mem_access_width))
             self.curr_out_channel += self.filters_per_map
             if self.read_ready and self.curr_out_channel < self.out_channels:
-                self.kern_reads += self.mem_access_width//(self.kernel_size*self.channels_per_map*self.filters_per_map)
+                self.kern_reads += math.ceil(float(self.kernel_size*self.channels_per_map*self.filters_per_map)/self.mem_access_width)
+                self.kern_inef.append(float(math.ceil(float(self.kernel_size*self.channels_per_map*self.filters_per_map)/self.mem_access_width)) / (float(self.kernel_size*self.channels_per_map*self.filters_per_map)/self.mem_access_width))
             if self.read_ready and self.curr_out_channel >= self.out_channels:
-                self.obj_reads += self.mem_access_width//(self.in_obj_size*self.channels_per_map)
+                self.obj_reads += math.ceil(float(self.in_obj_size*self.channels_per_map) / self.mem_access_width)
+                self.obj_inef.append(float(math.ceil(float(self.in_obj_size*self.channels_per_map) / self.mem_access_width)) / (float(self.in_obj_size*self.channels_per_map) / self.mem_access_width))
             return
         # 5
         elif self.state == 5:
@@ -232,16 +285,75 @@ class PhotonicAccelerator:
             self.compute_stats()
             return
 
+def read_config(path):
+    """ input filter/IFM/OFM dimensions """
+    
+    layer_name = []
+    in_obj_size = []
+    out_obj_size = []
+    in_channels = []
+    out_channels = []
+    kernel_size = []
+    
+    f = open(path, "r")
+    next(f) # skip header line
+    for line in f:
+        line = line.strip()
+        line = line.split(',')
+        # We support only CONV-type laters. "WA" is 1x1 pointwise CONV
+        if len(line) >= 7 and ("Conv" in line[0] or "WA" in line[0]):
+            print(line)
+            layer_name.append(line[0])
+            kernel_height = int(line[3])
+            kernel_width = int(line[4])
+            kernel_size.append(kernel_height * kernel_width)
+            # assuming padded inputs
+            padding_height = (kernel_height // 2) * 2
+            padding_width = (kernel_width // 2) * 2
+            input_height = int(line[1])
+            input_width = int(line[2])
+            in_obj_size.append(input_height * input_width)
+            out_obj_size.append((input_height - padding_height) * (input_width - padding_width))
+            in_channels.append(int(line[5]))
+            out_channels.append(int(line[6]))
+            stride = int(line[7])
+        else:
+            print("Skipping: {}".format(line[0]))
+    f.close()
+    
+    return layer_name, in_obj_size, out_obj_size, in_channels, out_channels, kernel_size
+        
 def main():
+    
     acc = PhotonicAccelerator()
 
-    acc.update_state(True)
-    cycle = 0
-    while not acc.done:
-        acc.apply_latch()
-        acc.update_state()
-        cycle += 1
-    print("Cycle count = {}".format(cycle))
+    # load CNN dimensions
+    layer_name, in_obj_size, out_obj_size, in_channels, out_channels, kernel_size = read_config("./model_cfgs/ImageNet/ResNet50_ImageNet.csv")
 
+    for layer_idx in range(len(layer_name)):
+        print()
+        print("Processing layer: {}".format(layer_name[layer_idx]))
+
+        # configure accelerator with current layer dimensions
+        acc.load_layer(in_obj_size[layer_idx], out_obj_size[layer_idx], in_channels[layer_idx], out_channels[layer_idx], kernel_size[layer_idx])
+
+        # update and apply FSM state until 'done' signal is reached
+        acc.update_state(True)
+        cycle = 0
+        while not acc.done:
+            acc.apply_latch()
+            acc.update_state()
+            cycle += 1
+        print("Cycle count = {}".format(cycle))
+
+    print()
+    cycles = acc.summary()
+
+    #print(layer_name)
+    ## input object size
+    #print([in_obj_size[i] * in_channels[i] for i in range(len(in_obj_size))])
+    #print(out_channels)
+    #print(cycles)
+    
 if __name__ == "__main__":
     main()
