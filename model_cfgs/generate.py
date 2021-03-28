@@ -38,8 +38,8 @@ def downsample(fp, layerNum, curH, curW, curC):
     return layerNum, curH, curW, curC
 
 def gen_yolov3():
-    curH = 256
-    curW = 256
+    curH = 256 #1225 #256
+    curW = 256 #1225 #256
     curC = 3
     layerNum = 1
     
