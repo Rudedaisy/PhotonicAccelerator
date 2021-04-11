@@ -63,8 +63,9 @@ class PhotonicAccelerator:
 
         # Determine critical path latency
         self.critical_path_latency = max(self.photonic.t, self.digital.latency, self.kernel_buffer.latency*self.MS_pix/self.mem_access_width/self.banks, self.object_buffer.latency*self.MS_pix/self.mem_access_width/self.banks)
+        #self.critical_path_latency = 1e-6 ######
         print("Critical path = {}".format(self.critical_path_latency))
-
+        
         # Lifetime summary variables
         self.total_latency = []
         self.total_cycle = []
