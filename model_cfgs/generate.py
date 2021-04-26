@@ -25,7 +25,8 @@ def block(fp, layerNum, curH, curW, curC):
 
     # residual output
     appendToFile(fp, "Resid"+str(layerNum), curH, curW, 1, 1, residC, nextC, 1)
-
+    _, layerNum = update(nextC, layerNum)
+    
     return layerNum, curC
 
 def downsample(fp, layerNum, curH, curW, curC):
