@@ -25,7 +25,8 @@ def block(fp, layerNum, curH, curW, curC):
 
     # residual output
     appendToFile(fp, "Resid"+str(layerNum), curH, curW, 1, 1, residC, nextC, 1)
-
+    _, layerNum = update(nextC, layerNum)
+    
     return layerNum, curC
 
 def downsample(fp, layerNum, curH, curW, curC):
@@ -38,8 +39,8 @@ def downsample(fp, layerNum, curH, curW, curC):
     return layerNum, curH, curW, curC
 
 def gen_yolov3():
-    curH = 256 #1225 #256
-    curW = 256 #1225 #256
+    curH = 1254 #1225 #256
+    curW = 1254 #1225 #256
     curC = 3
     layerNum = 1
     
