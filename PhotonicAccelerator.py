@@ -62,8 +62,8 @@ class PhotonicAccelerator:
         self.photonic = PhotonicSubsys(MS_pix=self.MS_pix, Nb=8)
 
         # Determine critical path latency
-        self.critical_path_latency = max(self.photonic.t, self.digital.latency, self.kernel_buffer.latency*self.MS_pix/self.mem_access_width/self.banks, self.object_buffer.latency*self.MS_pix/self.mem_access_width/self.banks)
-        #self.critical_path_latency = 1e-6 ######
+        #self.critical_path_latency = max(self.photonic.t, self.digital.latency, self.kernel_buffer.latency*self.MS_pix/self.mem_access_width/self.banks, self.object_buffer.latency*self.MS_pix/self.mem_access_width/self.banks)
+        self.critical_path_latency = 1e-6 ######
         print("Critical path = {}".format(self.critical_path_latency))
         
         # Lifetime summary variables
@@ -166,7 +166,8 @@ class PhotonicAccelerator:
         #for i in range(len(self.total_latency)):
         #    accumulated.append(sum(self.total_latency[:i+1]))
         #print(accumulated)
-            
+
+        #print(self.total_cycle)
         print("--Critical paths--")
         print("Photonic: {}".format(self.photonic.t))
         print("Digital: {}".format(self.digital.latency))
