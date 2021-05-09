@@ -81,6 +81,9 @@ class PhotonicAccelerator:
         # Determine critical path latency
         if int(self.config.get("general", "cp_override")):
             self.critical_path_latency = float(self.config.get("general", "critical_path"))
+        elif int(self.config.get("general", "FIFO")):
+            self.critical_path_latency = max(self.photonic.t,
+                                             self.digital.latency)
         else:
             self.critical_path_latency = max(self.photonic.t,
                                              self.digital.latency,
