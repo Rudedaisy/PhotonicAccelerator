@@ -31,7 +31,7 @@ class MemObj:
         # Run CACTI and send results to local file
         cwd = os.getcwd()
         with open(os.path.join(cwd, "out", memstats_fname), 'w') as fout:
-            subprocess.run(["./cacti", "-infile", os.path.join(cwd, "configs", config_fname)], cwd=CACTI_path, stdout=fout, check=True)
+            subprocess.run(["./cacti", "-infile", os.path.join(cwd, "mem_cfgs", config_fname)], cwd=CACTI_path, stdout=fout, check=True)
 
         # Read cacti stats file and import key stats
         fin = open(os.path.join(cwd, "out", memstats_fname), 'r')

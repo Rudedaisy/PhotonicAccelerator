@@ -5,14 +5,18 @@ Author:   Edward Hanson (edward.t.hanson@duke.edu)
 """
 
 import numpy as np
+import configparser as cp
 
 class PhotonicSubsys:
 
-    def __init__(self, MS_pix=1e6, Nb=8):
+    def __init__(self, config_path, MS_pix=1e6, Nb=8):
         """
         MS_pix      - total number of pixels for a metasurface
         Nb          - precision of each pixel
         """
+
+        self.config = cp.ConfigParser()
+        self.config.read(config_path)
         
         self.MS_pix = MS_pix
         self.Nb = Nb
@@ -30,7 +34,7 @@ class PhotonicSubsys:
         # Total optical energy required to make the measurement
         self.E = self.hbar*self.omega*self.np*self.MS_pix
         # Time to take measurement (determined by LC switching speed)
-        self.t = 1e-6
+        self.t = float(self.config.get("photonic", "t"))
         # Optical power
         self.P = self.E / self.t
 

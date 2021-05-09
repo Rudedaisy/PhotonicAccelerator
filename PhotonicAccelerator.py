@@ -9,23 +9,26 @@ from DigitalSubsys import DigitalSubsys
 from MemObj import MemObj
 import math
 import numpy as np
+import configparser as cp
+import csv
 
 class PhotonicAccelerator:
 
-    def __init__(self):
+    def __init__(self, config_path):
         """
-        WORK IN PROGRESS
-        TODO:
         - Compute critical path latency and total area
         - Compute cycle-accurate energy costs
-        - Implement flexible memory subsystem with handshaking signals
-        - Implement updated control flow
+        - Implement flexible memory subsystem with optional FIFO buffer
+        - Implement control flow (FSM)
         """
 
-        # Constants
-        self.MS_dim = 3238 #1e3
-        self.MS_pix = self.MS_dim * self.MS_dim
+        self.config = cp.ConfigParser()
+        self.config.read(config_path)
         
+        # Constants
+        self.MS_pix = float(self.config.get("photonic", "MS_pix"))
+        self.MS_dim = math.floor(math.sqrt(self.MS_pix))
+
         # Default layer stats
         self.in_obj_size = 1024
         self.out_obj_size = 256
@@ -50,21 +53,39 @@ class PhotonicAccelerator:
         self.obj_writes = 0
         self.fft_convs = 0
         self.ops = 0
-        
-        ###### TODO: REPLACE WITH FLEXIBLE MEMORY HIERARCHY SUPERCLASS
-        self.kernel_buffer = MemObj(1, "../cacti", "eDRAM-32MB-25w.cfg")
-        self.object_buffer = MemObj(2, "../cacti", "eDRAM-64MB-25w.cfg")
-        #self.resid_buffer = MemObj("../cacti", "cache.cfg")
-        self.mem_access_width = 1 ##16
-        self.banks = 1024
+
+        # Instantiate memory subsys
+        cacti_dir = self.config.get("simulation", "cacti")
+        kernel_cfg = self.config.get("memory", "kernel_buffer")
+        object_cfg = self.config.get("memory", "object_buffer")
+        kernel_ports = float(self.config.get("memory", "kernel_ports"))
+        object_ports = float(self.config.get("memory", "object_ports"))
+        self.kernel_buffer = MemObj(kernel_ports, cacti_dir, kernel_cfg)
+        self.object_buffer = MemObj(object_ports, cacti_dir, object_cfg)
+        self.mem_access_width = float(self.config.get("memory", "mem_access_width"))
+        self.banks = float(self.config.get("memory", "banks"))
+        if int(self.config.get("memory", "mem_override")):
+            self.E_read = float(self.config.get("memory", "E_read"))
+            self.E_write = float(self.config.get("memory", "E_write"))
         # Instantiate digital subsys
-        self.digital = DigitalSubsys(MS_dim=self.MS_dim, DAC_group_size=1, ADC_group_size=1)
+        DAC_group_size = float(self.config.get("digital", "DAC_group_size"))
+        ADC_group_size = float(self.config.get("digital", "ADC_group_size"))
+        self.digital = DigitalSubsys(config_path, MS_dim=self.MS_dim, DAC_group_size=DAC_group_size, ADC_group_size=ADC_group_size)
+        if int(self.config.get("digital", "adda_override")):
+            self.E_adc = float(self.config.get("digital", "E_adc"))
+            self.E_dac = float(self.config.get("digital", "E_dac"))
         # Instantiate photonic subsys
-        self.photonic = PhotonicSubsys(MS_pix=self.MS_pix, Nb=8)
+        Nb = float(self.config.get("photonic", "Nb"))
+        self.photonic = PhotonicSubsys(config_path, MS_pix=self.MS_pix, Nb=Nb)
 
         # Determine critical path latency
-        #self.critical_path_latency = max(self.photonic.t, self.digital.latency, self.kernel_buffer.latency*self.MS_pix/self.mem_access_width/self.banks, self.object_buffer.latency*self.MS_pix/self.mem_access_width/self.banks)
-        self.critical_path_latency = 1e-6 ######
+        if int(self.config.get("general", "cp_override")):
+            self.critical_path_latency = float(self.config.get("general", "critical_path"))
+        else:
+            self.critical_path_latency = max(self.photonic.t,
+                                             self.digital.latency,
+                                             self.kernel_buffer.latency*self.MS_pix/self.mem_access_width/self.banks,
+                                             self.object_buffer.latency*self.MS_pix/self.mem_access_width/self.banks)
         print("Critical path = {}".format(self.critical_path_latency))
         
         # Lifetime summary variables
@@ -95,32 +116,29 @@ class PhotonicAccelerator:
         self.filters_per_map = 1
 
         # we can directly count the number of OPs (MACs * 2) here
-        window_ops = self.kernel_size * self.in_channels * self.out_channels
-        #self.ops = window_ops * (self.out_obj_size / self.stride / self.stride) * 2
+        window_ops = self.kernel_size * self.in_channels * self.out_channels * 2
         self.ops = window_ops * self.out_obj_size
 
         return
 
     def compute_stats(self):
-        """
-        WORK IN PROGRESS
-        """
         total_latency = self.critical_path_latency * self.cycle
-        photonic_energy = self.fft_convs * self.photonic.E 
-        #digital_energy = total_latency * self.digital.avgPower
-        #obj_energy = (self.obj_reads * self.object_buffer.read_energy) + (self.obj_writes * self.object_buffer.write_energy) + (total_latency * self.object_buffer.static_power)
-        #kern_energy = (self.kern_reads * self.kernel_buffer.read_energy) + (total_latency * self.kernel_buffer.static_power)
-        #"""
-        # --- Alternative calculation using unit costs
-        E_adc = 1.2e-12
-        E_dac = 0.3e-12
-        E_read = 3.5e-12
-        E_write = 3.5e-12
-        digital_energy = (self.obj_reads + (self.kern_reads*2)) * self.mem_access_width * E_dac
-        digital_energy += (self.obj_writes*2) * self.mem_access_width * E_adc
-        obj_energy = (self.obj_reads * self.mem_access_width * E_read) + (self.obj_writes * self.mem_access_width * E_write)
-        kern_energy = self.kern_reads * self.mem_access_width * E_read
-        #"""
+        photonic_energy = self.fft_convs * self.photonic.E
+
+        if int(self.config.get("digital", "adda_override")):
+            digital_energy = total_latency * (self.digital.bls_avgPower + self.digital.nonlinear_avgPower + self.digital.control_avgPower)
+            digital_energy += (self.obj_reads + (self.kern_reads*2)) * self.mem_access_width * self.E_dac
+            digital_energy += (self.obj_writes*2) * self.mem_access_width * self.E_adc
+        else:
+            digital_energy = total_latency * self.digital.avgPower
+
+        if int(self.config.get("memory", "mem_override")):
+            obj_energy = (self.obj_reads * self.mem_access_width * self.E_read) + (self.obj_writes * self.mem_access_width * self.E_write)
+            kern_energy = self.kern_reads * self.mem_access_width * self.E_read
+        else:
+            obj_energy = (self.obj_reads * self.object_buffer.read_energy) + (self.obj_writes * self.object_buffer.write_energy) + (total_latency * self.object_buffer.static_power)
+            kern_energy = (self.kern_reads * self.kernel_buffer.read_energy) + (total_latency * self.kernel_buffer.static_power)
+            
         self.total_latency.append(total_latency)
         self.total_cycle.append(self.cycle)
         self.photonic_energy.append(photonic_energy)
@@ -130,18 +148,15 @@ class PhotonicAccelerator:
         self.total_fft_convs.append(self.fft_convs)
         self.total_ops.append(self.ops)
         self.layerwise_MS_util.append(float(self.in_obj_size * self.channels_per_map) / self.MS_pix)
-        
-        print("Total latency \t\t= {}".format(total_latency))
-        print("Photonic energy \t= {}".format(photonic_energy))
-        print("Digital energy \t\t= {}".format(digital_energy))
-        print("Object buffer energy \t= {}".format(obj_energy))
-        print("Kernel buffer energy \t= {}".format(kern_energy))
 
-        print("Total energy \t\t= {}".format(photonic_energy + digital_energy + obj_energy + kern_energy))
-        print("Avg power \t\t= {}".format((photonic_energy + digital_energy + obj_energy + kern_energy) / total_latency))
-        #print(self.obj_reads * self.mem_access_width)
-        #print((self.kern_reads*2)* self.mem_access_width)
-        #print((self.obj_writes*2) * self.mem_access_width)
+        if int(self.config.get("simulation", "dump_layerwise")):
+            print("Total latency \t\t= {}".format(total_latency))
+            print("Photonic energy \t= {}".format(photonic_energy))
+            print("Digital energy \t\t= {}".format(digital_energy))
+            print("Object buffer energy \t= {}".format(obj_energy))
+            print("Kernel buffer energy \t= {}".format(kern_energy))
+            print("Total energy \t\t= {}".format(photonic_energy + digital_energy + obj_energy + kern_energy))
+            print("Avg power \t\t= {}".format((photonic_energy + digital_energy + obj_energy + kern_energy) / total_latency))
         
         return
 
@@ -151,7 +166,6 @@ class PhotonicAccelerator:
         print("CNN latency: \t\t{} s".format(sum(self.total_latency)))
         print("CNN cycle count: \t{}".format(sum(self.total_cycle)))
         total_energy = sum(self.photonic_energy) + sum(self.digital_energy) + sum(self.obj_energy) + sum(self.kern_energy)
-        #total_energy = sum(self.digital_energy) + sum(self.obj_energy) + sum(self.kern_energy)
         print("Total energy: \t\t{} J".format(total_energy))
         print("\tPhotonic: \t{:%}".format(sum(self.photonic_energy) / total_energy))
         print("\tDigital: \t{:%}".format(sum(self.digital_energy) / total_energy))
@@ -162,28 +176,41 @@ class PhotonicAccelerator:
 
         scaled_util = [self.layerwise_MS_util[i]*self.total_fft_convs[i] / sum(self.total_fft_convs) for i in range(len(self.layerwise_MS_util))]
         print("Avg utilization: {}".format(sum(scaled_util)))
+        print("OP: {}".format(sum(self.total_ops)))
         print("TOPS/W: {}".format(sum(self.total_ops) * 1e-12 / total_energy))
         print(" --------------------- ")
 
-        #total_energies = np.sum([self.photonic_energy, self.digital_energy, self.obj_energy, self.kern_energy], axis=0)
-        #print(list(list(np.array(self.total_ops) * 1e-12) / total_energies))
-        #print(list(list(np.array(self.total_ops) * 1e-12) / np.array(self.total_latency)))
-        #accumulated = []
-        #for i in range(len(self.total_latency)):
-        #    accumulated.append(sum(self.total_latency[:i+1]))
-        #print(accumulated)
-        #times = [i*self.critical_path_latency for i in self.total_cycle]
-        #for i in range(1,len(times)):
-        #    times[i] += times[i-1]
-        #print(times)
-        #print(self.total_ops)
-        
-        print("--Critical paths--")
-        print("Photonic: {}".format(self.photonic.t))
-        print("Digital: {}".format(self.digital.latency))
-        print("Kernel read: {}".format(self.kernel_buffer.latency*self.MS_pix/self.mem_access_width/self.banks))
-        print("OBJ read: {}".format(self.object_buffer.latency*self.MS_pix/self.mem_access_width/self.banks))
+        total_energies = np.sum([self.photonic_energy, self.digital_energy, self.obj_energy, self.kern_energy], axis=0)
+        total_TOPS = list(list(np.array(self.total_ops) * 1e-12) / np.array(self.total_latency))
+        total_TOPSW = list(list(np.array(self.total_ops) * 1e-12) / np.array(self.total_latency))
+        accumulated = []
+        for i in range(len(self.total_latency)):
+            accumulated.append(sum(self.total_latency[:i+1]))
 
+        # Save all traces    
+        output_file = self.config.get("simulation", "output")
+        data = [["Stat"] + ["layer-"+str(layer_idx) for layer_idx in range(len(self.total_latency))],
+                ["cycle count"] + self.total_cycle,
+                ["latency"] + self.total_latency,
+                ["Accumulated latency"] + accumulated,
+                ["FFT convs"] + self.total_fft_convs,
+                ["MS utilization"] + self.layerwise_MS_util,
+                ["Scaled MS utilization"] + scaled_util,
+                ["OP"] + self.total_ops,
+                ["Photonic energy"] + self.photonic_energy,
+                ["Digital energy"] + self.digital_energy,
+                ["Object buffer energy"] + self.obj_energy,
+                ["Kernel buffer energy"] + self.kern_energy,
+                ["Total energy"] + list(total_energies),
+                ["TOPS"] + total_TOPS,
+                ["TOPS/W"] + total_TOPSW]
+
+        fp = open(output_file, 'w', newline ='')
+        with fp:    
+            write = csv.writer(fp)
+            write.writerows(data)
+        fp.close()
+        
         return self.total_cycle
         
     def update_state(self, start=False):
@@ -349,7 +376,7 @@ def read_config(path):
         line = line.strip()
         line = line.split(',')
         # We support only CONV-type laters. "WA" is 1x1 pointwise CONV
-        if len(line) >= 7 and ("Conv" in line[0] or "WA" in line[0]):
+        if len(line) >= 7 and ("Conv" in line[0] or "WA" in line[0] or "Resid" in line[0]):
             print(line)
             layer_name.append(line[0])
             kernel_height = int(line[3])
