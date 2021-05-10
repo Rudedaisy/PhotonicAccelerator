@@ -3,7 +3,7 @@ File:     PhotonicAccelerator.py
 Author:   Edward Hanson (edward.t.hanson@duke.edu)
 Desc:     Complete description of photonic accelerator system
 """
-
+ 
 from PhotonicSubsys import PhotonicSubsys
 from DigitalSubsys import DigitalSubsys
 from MemObj import MemObj
