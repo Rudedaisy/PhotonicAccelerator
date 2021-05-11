@@ -6,10 +6,11 @@ Desc:     Memory object simulation. Parameters are initialized using integrated 
 
 import os
 import subprocess
+import configparser as cp
 
 class MemObj:
 
-    def __init__(self, num_ports, CACTI_path, config_fname, memstats_fname=("CACTI.out")):
+    def __init__(self, config_path, num_ports, CACTI_path, config_fname, memstats_fname=("CACTI.out")):
         """
         num_ports      - if only 1 port, assume only read OR write each cycle (rd/wr port)
                        - if 2 ports, assume one read & one write port
@@ -18,6 +19,9 @@ class MemObj:
         memstats_fname - name of the CACTI stats output file
         """
 
+        self.config = cp.ConfigParser()
+        self.config.read(config_path)
+        
         # These parameters will be initialized using the config file
         self.latency = self.read_energy = self.write_energy = self.static_power = self.area = None
         # Number of ports
@@ -53,6 +57,9 @@ class MemObj:
         assert self.static_power != None, "Error obtaining memory static power"
         assert self.area != None, "Error obtaining memory area"
 
+        leakage_scale = float(self.config.get("memory", "leakage_scale"))
+        self.static_power = self.static_power * leakage_scale
+        
         #print(self.latency, self.read_energy, self.write_energy, self.static_power, self.area)
 
     def update_state(self, toread=False, towrite=False):

@@ -60,8 +60,8 @@ class PhotonicAccelerator:
         object_cfg = self.config.get("memory", "object_buffer")
         kernel_ports = float(self.config.get("memory", "kernel_ports"))
         object_ports = float(self.config.get("memory", "object_ports"))
-        self.kernel_buffer = MemObj(kernel_ports, cacti_dir, kernel_cfg)
-        self.object_buffer = MemObj(object_ports, cacti_dir, object_cfg)
+        self.kernel_buffer = MemObj(config_path, kernel_ports, cacti_dir, kernel_cfg)
+        self.object_buffer = MemObj(config_path, object_ports, cacti_dir, object_cfg)
         self.mem_access_width = float(self.config.get("memory", "mem_access_width"))
         self.banks = float(self.config.get("memory", "banks"))
         if int(self.config.get("memory", "mem_override")):
