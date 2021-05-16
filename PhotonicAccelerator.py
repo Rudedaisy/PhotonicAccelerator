@@ -96,6 +96,8 @@ class PhotonicAccelerator:
         self.total_cycle = []
         self.photonic_energy = []
         self.digital_energy = []
+        self.DAC_energy = []
+        self.ADC_energy = []
         self.obj_energy = []
         self.kern_energy = []
         self.total_fft_convs = []
@@ -130,10 +132,13 @@ class PhotonicAccelerator:
 
         if int(self.config.get("digital", "adda_override")):
             digital_energy = total_latency * (self.digital.bls_avgPower + self.digital.nonlinear_avgPower + self.digital.control_avgPower)
-            digital_energy += (self.obj_reads + (self.kern_reads*2)) * self.mem_access_width * self.E_dac
-            digital_energy += (self.obj_writes*2) * self.mem_access_width * self.E_adc
+            DAC_energy = (self.obj_reads + (self.kern_reads*2)) * self.mem_access_width * self.E_dac
+            ADC_energy = (self.obj_writes*2) * self.mem_access_width * self.E_adc
+            digital_energy += (DAC_energy + ADC_energy)
         else:
             digital_energy = total_latency * self.digital.avgPower
+            DAC_energy = total_latency * self.digital.DACrow_avgPower
+            ADC_energy = total_latency * self.digital.ADCrow_avgPower
 
         if int(self.config.get("memory", "mem_override")):
             obj_energy = (self.obj_reads * self.mem_access_width * self.E_read) + (self.obj_writes * self.mem_access_width * self.E_write)
@@ -146,6 +151,8 @@ class PhotonicAccelerator:
         self.total_cycle.append(self.cycle)
         self.photonic_energy.append(photonic_energy)
         self.digital_energy.append(digital_energy)
+        self.DAC_energy.append(DAC_energy)
+        self.ADC_energy.append(ADC_energy)
         self.obj_energy.append(obj_energy)
         self.kern_energy.append(kern_energy)
         self.total_fft_convs.append(self.fft_convs)
@@ -156,6 +163,8 @@ class PhotonicAccelerator:
             print("Total latency \t\t= {}".format(total_latency))
             print("Photonic energy \t= {}".format(photonic_energy))
             print("Digital energy \t\t= {}".format(digital_energy))
+            print("DAC energy \t\t\t= {}".format(DAC_energy))
+            print("ADC energy \t\t\t= {}".format(ADC_energy))
             print("Object buffer energy \t= {}".format(obj_energy))
             print("Kernel buffer energy \t= {}".format(kern_energy))
             print("Total energy \t\t= {}".format(photonic_energy + digital_energy + obj_energy + kern_energy))
@@ -172,6 +181,8 @@ class PhotonicAccelerator:
         print("Total energy: \t\t{} J".format(total_energy))
         print("\tPhotonic: \t{:%}".format(sum(self.photonic_energy) / total_energy))
         print("\tDigital: \t{:%}".format(sum(self.digital_energy) / total_energy))
+        print("\t-->DAC: \t{:%}".format(sum(self.DAC_energy) / total_energy))
+        print("\t-->ADC: \t{:%}".format(sum(self.ADC_energy) / total_energy))
         print("\tObj buffer: \t{:%}\tRead inefficiency: \t{}\tWrite ineffciency: \t{}".format(sum(self.obj_energy) / total_energy, sum(self.obj_inef) / len(self.obj_inef), sum(self.obj_write_inef) / len(self.obj_write_inef)))
         print("\tKern buffer: \t{:%}\tRead inefficiency: \t{}".format(sum(self.kern_energy) / total_energy, sum(self.kern_inef) / len(self.kern_inef)))
         print("Average power: \t\t{} W".format(total_energy / sum(self.total_latency)))
@@ -202,6 +213,8 @@ class PhotonicAccelerator:
                 ["OP"] + self.total_ops,
                 ["Photonic energy"] + self.photonic_energy,
                 ["Digital energy"] + self.digital_energy,
+                ["DAC energy"] + self.DAC_energy,
+                ["ADC energy"] + self.ADC_energy,
                 ["Object buffer energy"] + self.obj_energy,
                 ["Kernel buffer energy"] + self.kern_energy,
                 ["Total energy"] + list(total_energies),
@@ -362,7 +375,7 @@ class PhotonicAccelerator:
             self.compute_stats()
             return
 
-def read_config(path):
+def read_config(path, skip_resid=False):
     """ input filter/IFM/OFM dimensions """
     
     layer_name = []
@@ -379,7 +392,7 @@ def read_config(path):
         line = line.strip()
         line = line.split(',')
         # We support only CONV-type laters. "WA" is 1x1 pointwise CONV
-        if len(line) >= 7 and ("Conv" in line[0] or "WA" in line[0] or "Resid" in line[0]):
+        if len(line) >= 7 and ("Conv" in line[0] or "WA" in line[0] or ((not skip_resid) and ("Resid" in line[0]))):
             print(line)
             layer_name.append(line[0])
             kernel_height = int(line[3])

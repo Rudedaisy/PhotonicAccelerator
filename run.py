@@ -24,9 +24,10 @@ def main():
 
     model_cfg = config.get("simulation", "model_cfg")
     model_cfg = os.path.join(cwd, "model_cfgs", model_cfg)
+    skip_resid = int(config.get("simulation", "skip_resid"))
     
     # load CNN dimensions
-    layer_name, in_obj_size, out_obj_size, in_channels, out_channels, kernel_size, stride = read_config(model_cfg)
+    layer_name, in_obj_size, out_obj_size, in_channels, out_channels, kernel_size, stride = read_config(model_cfg, skip_resid)
 
     for layer_idx in range(len(layer_name)):
         print()

@@ -36,21 +36,22 @@ class MemObj:
         cwd = os.getcwd()
         with open(os.path.join(cwd, "out", memstats_fname), 'w') as fout:
             subprocess.run(["./cacti", "-infile", os.path.join(cwd, "mem_cfgs", config_fname)], cwd=CACTI_path, stdout=fout, check=True)
-
+            fout.close()
+            
         # Read cacti stats file and import key stats
         fin = open(os.path.join(cwd, "out", memstats_fname), 'r')
         for line in fin:
-            if "Access time (ns):" in line:
+            if self.latency==None and "Access time (ns):" in line:
                 self.latency = float(line.split(':')[1].strip()) * 1e-9
-            elif ("Total dynamic read energy per access (nJ):" in line) or ("Read Energy (nJ):" in line):
+            elif self.read_energy==None and (("Total dynamic read energy per access (nJ):" in line) or ("Read Energy (nJ):" in line)):
                 self.read_energy = float(line.split(':')[1].strip()) * 1e-9
-            elif ("Total dynamic write energy per access (nJ):" in line) or ("Write Energy (nJ):" in line):
+            elif self.write_energy==None and (("Total dynamic write energy per access (nJ):" in line) or ("Write Energy (nJ):" in line)):
                 self.write_energy = float(line.split(':')[1].strip()) * 1e-9
-            elif ("Total leakage power of a bank (mW):" in line) or ("Leakage Power I/O (mW):" in line): #("Leakage Power Open Page (mW):" in line):
+            elif self.static_power==None and (("Total leakage power of a bank (mW):" in line) or ("Leakage Power I/O (mW):" in line)): #("Leakage Power Open Page (mW):" in line):
                 self.static_power = float(line.split(':')[1].strip()) * 1e-3
             elif "Data array: Area (mm2):" in line:
                 self.area = float(line.split(':')[2].strip())
-                
+
         assert self.latency != None, "Error obtaining memory latency"
         assert self.read_energy!= None, "Error obtaining memory read energy"
         assert self.write_energy != None, "Error obtaining memory write energy"
