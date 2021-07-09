@@ -1,6 +1,9 @@
-# File:    generate.py
+# File:    generate_YOLOv3.py
 # Author:  Edward Hanson (edward.t.hanson@duke.edu)
 # Desc.    Generate YOLOv3 (Darknet-53) config file
+
+startingH = 1254 #1225 #256
+startingW = 1254 #1225 #256
 
 def appendToFile(fp, name, H, W, KH, KW, IC, OC, stride):
     fp.write(str(name)+",\t" + str(H)+",\t" + str(W)+",\t" + str(KH)+",\t" + str(KW)+",\t" + str(IC)+",\t" + str(OC)+",\t" + str(stride)+",\n")
@@ -23,9 +26,9 @@ def block(fp, layerNum, curH, curW, curC):
     appendToFile(fp, "Conv"+str(layerNum), curH+2, curW+2, 3, 3, curC, nextC, 1)
     curC, layerNum = update(nextC, layerNum)
 
-    # residual output
-    appendToFile(fp, "Resid"+str(layerNum), curH, curW, 1, 1, residC, nextC, 1)
-    _, layerNum = update(nextC, layerNum)
+    ## residual output
+    #appendToFile(fp, "Resid"+str(layerNum), curH, curW, 1, 1, residC, nextC, 1)
+    #_, layerNum = update(nextC, layerNum)
     
     return layerNum, curC
 
@@ -39,8 +42,8 @@ def downsample(fp, layerNum, curH, curW, curC):
     return layerNum, curH, curW, curC
 
 def gen_yolov3():
-    curH = 1254 #1225 #256
-    curW = 1254 #1225 #256
+    curH = startingH
+    curW = startingW
     curC = 3
     layerNum = 1
     

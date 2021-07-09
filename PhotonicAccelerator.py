@@ -191,6 +191,7 @@ class PhotonicAccelerator:
         scaled_util = [self.layerwise_MS_util[i]*self.total_fft_convs[i] / sum(self.total_fft_convs) for i in range(len(self.layerwise_MS_util))]
         print("Avg utilization: {}".format(sum(scaled_util)))
         print("OP: {}".format(sum(self.total_ops)))
+        print("TOPS: {}".format(sum(self.total_ops) * 1e-12 / sum(self.total_latency)))
         print("TOPS/W: {}".format(sum(self.total_ops) * 1e-12 / total_energy))
         print(" --------------------- ")
 
