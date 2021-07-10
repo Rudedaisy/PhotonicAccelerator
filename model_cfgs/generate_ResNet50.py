@@ -2,8 +2,8 @@
 # Author:  Edward Hanson (edward.t.hanson@duke.edu)
 # Desc.    Generate ResNet50 config file
 
-startingH = 1254 #1225 #256
-startingW = 1254 #1225 #256
+startingH = 224 #1254 #1225 #256
+startingW = 224 #1254 #1225 #256
 
 def appendToFile(fp, name, H, W, KH, KW, IC, OC, stride):
     fp.write(str(name)+",\t" + str(H)+",\t" + str(W)+",\t" + str(KH)+",\t" + str(KW)+",\t" + str(IC)+",\t" + str(OC)+",\t" + str(stride)+",\n")
@@ -60,7 +60,9 @@ def gen_yolov3():
     
     # 1
     nextC = 64
-    appendToFile(fp, "Conv"+str(layerNum), curH+2, curW+2, 7, 7, curC, nextC, 1)
+    appendToFile(fp, "Conv"+str(layerNum), curH+2, curW+2, 7, 7, curC, nextC, 2)
+    curH = curH // 4
+    curW = curW // 4
     curC, layerNum = update(nextC, layerNum)
     
     # block 2
