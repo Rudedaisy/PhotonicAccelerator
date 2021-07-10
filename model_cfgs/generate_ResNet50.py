@@ -16,8 +16,10 @@ def update(nextC, layerNum):
 def block(fp, layerNum, curH, curW, curC, midC, lastC, first=False, downsample=False):
     if first:
         residC = curC
-
-    if downsample:
+        residH = curH
+        residW = curW
+        
+    if first and downsample:
         initial_stride = 2
     else:
         initial_stride = 1
@@ -27,13 +29,13 @@ def block(fp, layerNum, curH, curW, curC, midC, lastC, first=False, downsample=F
     appendToFile(fp, "Conv"+str(layerNum), curH, curW, 1, 1, curC, nextC, initial_stride)
     curC, layerNum = update(nextC, layerNum)
 
-    if downsample:
+    if first and downsample:
         curH = curH // 2
         curW = curW // 2
     
     # 3x3 conv
     nextC = midC
-    appendToFile(fp, "Conv"+str(layerNum), curH+2, curW+2, 3, 3, curC, nextC, 1)
+    appendToFile(fp, "Conv"+str(layerNum), curH, curW, 3, 3, curC, nextC, 1)
     curC, layerNum = update(nextC, layerNum)
 
     # bottleneck
@@ -44,10 +46,10 @@ def block(fp, layerNum, curH, curW, curC, midC, lastC, first=False, downsample=F
     if first:
         nextC = lastC
         # residual output
-        appendToFile(fp, "Resid"+str(layerNum), curH, curW, 1, 1, residC, nextC, 1)
+        appendToFile(fp, "Resid"+str(layerNum), residH, residW, 1, 1, residC, nextC, initial_stride)
         _, layerNum = update(nextC, layerNum)
     
-    return layerNum, curC
+    return layerNum, curC, curH, curW
 
 def gen_yolov3():
     curH = startingH
@@ -60,26 +62,26 @@ def gen_yolov3():
     
     # 1
     nextC = 64
-    appendToFile(fp, "Conv"+str(layerNum), curH+2, curW+2, 7, 7, curC, nextC, 2)
+    appendToFile(fp, "Conv"+str(layerNum), curH, curW, 7, 7, curC, nextC, 2)
     curH = curH // 4
     curW = curW // 4
     curC, layerNum = update(nextC, layerNum)
     
     # block 2
     for i in range(3):
-        layerNum, curC = block(fp, layerNum, curH, curW, curC, 64, 256, first=(i==0), downsample=False)
+        layerNum, curC, curH, curW = block(fp, layerNum, curH, curW, curC, 64, 256, first=(i==0), downsample=False)
 
     # block 3
     for i in range(4):
-        layerNum, curC = block(fp, layerNum, curH, curW, curC, 128, 512, first=(i==0), downsample=True)
+        layerNum, curC, curH, curW = block(fp, layerNum, curH, curW, curC, 128, 512, first=(i==0), downsample=True)
 
     # block 4
     for i in range(6):
-        layerNum, curC = block(fp, layerNum, curH, curW, curC, 256, 1024, first=(i==0), downsample=True)
+        layerNum, curC, curH, curW = block(fp, layerNum, curH, curW, curC, 256, 1024, first=(i==0), downsample=True)
 
     # block 5
     for i in range(3):
-        layerNum, curC = block(fp, layerNum, curH, curW, curC, 512, 2048, first=(i==0), downsample=True)
+        layerNum, curC, curH, curW = block(fp, layerNum, curH, curW, curC, 512, 2048, first=(i==0), downsample=True)
 
     fp.close()
     

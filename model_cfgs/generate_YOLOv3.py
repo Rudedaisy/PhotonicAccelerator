@@ -23,7 +23,7 @@ def block(fp, layerNum, curH, curW, curC):
 
     # 3x3 conv
     nextC = int(curC * 2)
-    appendToFile(fp, "Conv"+str(layerNum), curH+2, curW+2, 3, 3, curC, nextC, 1)
+    appendToFile(fp, "Conv"+str(layerNum), curH, curW, 3, 3, curC, nextC, 1)
     curC, layerNum = update(nextC, layerNum)
 
     ## residual output
@@ -34,7 +34,7 @@ def block(fp, layerNum, curH, curW, curC):
 
 def downsample(fp, layerNum, curH, curW, curC):
     nextC = int(curC * 2)
-    appendToFile(fp, "Conv"+str(layerNum), curH+2, curW+2, 3, 3, curC, nextC, 2)
+    appendToFile(fp, "Conv"+str(layerNum), curH, curW, 3, 3, curC, nextC, 2)
     curH = int(curH/2)
     curW = int(curW/2)
     curC, layerNum = update(nextC, layerNum)
@@ -52,7 +52,7 @@ def gen_yolov3():
     
     # 1
     nextC = 32
-    appendToFile(fp, "Conv"+str(layerNum), curH+2, curW+2, 3, 3, curC, nextC, 1)
+    appendToFile(fp, "Conv"+str(layerNum), curH, curW, 3, 3, curC, nextC, 1)
     curC, layerNum = update(nextC, layerNum)
     
     # 2
