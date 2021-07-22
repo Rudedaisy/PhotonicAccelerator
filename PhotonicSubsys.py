@@ -32,7 +32,10 @@ class PhotonicSubsys:
         self.np = (2/3)*2**(2*self.Nb)
 
         # Total optical energy required to make the measurement
-        self.E = self.hbar*self.omega*self.np*self.MS_pix
+        if int(self.config.get("general", "en_optical")):
+            self.E = self.hbar*self.omega*self.np*self.MS_pix
+        else:
+            self.E = 0
         # Time to take measurement (determined by LC switching speed)
         self.t = float(self.config.get("photonic", "t"))
         # Optical power

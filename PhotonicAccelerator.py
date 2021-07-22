@@ -72,8 +72,14 @@ class PhotonicAccelerator:
         ADC_group_size = float(self.config.get("digital", "ADC_group_size"))
         self.digital = DigitalSubsys(config_path, MS_dim=self.MS_dim, DAC_group_size=DAC_group_size, ADC_group_size=ADC_group_size)
         if int(self.config.get("digital", "adda_override")):
-            self.E_adc = float(self.config.get("digital", "E_adc"))
-            self.E_dac = float(self.config.get("digital", "E_dac"))
+            if int(self.config.get("general", "en_ADC")):
+                self.E_adc = float(self.config.get("digital", "E_adc"))
+            else:
+                self.E_adc = 0
+            if int(self.config.get("general", "en_DAC")):
+                self.E_dac = float(self.config.get("digital", "E_dac"))
+            else:
+                self.E_dac = 0
         # Instantiate photonic subsys
         Nb = float(self.config.get("photonic", "Nb"))
         self.photonic = PhotonicSubsys(config_path, MS_pix=self.MS_pix, Nb=Nb)
@@ -117,6 +123,9 @@ class PhotonicAccelerator:
         self.total_fft_convs = []
         self.total_ops = []
         self.layerwise_MS_util = []
+        self.total_obj_reads = []
+        self.total_kern_reads = []
+        self.total_obj_writes = []
         # buffer width inefficiency
         self.obj_inef = []
         self.obj_write_inef = []
@@ -172,7 +181,10 @@ class PhotonicAccelerator:
         self.total_fft_convs.append(self.fft_convs)
         self.total_ops.append(self.ops)
         self.layerwise_MS_util.append(float(self.in_obj_size * self.channels_per_map) / self.MS_pix)
-
+        self.total_obj_reads.append(self.obj_reads)
+        self.total_kern_reads.append(self.kern_reads)
+        self.total_obj_writes.append(self.obj_writes)
+        
         if int(self.config.get("simulation", "dump_layerwise")):
             print("Total latency \t\t= {}".format(total_latency))
             print("Photonic energy \t= {}".format(photonic_energy))
@@ -223,6 +235,9 @@ class PhotonicAccelerator:
                 ["latency"] + self.total_latency,
                 ["Accumulated latency"] + accumulated,
                 ["FFT convs"] + self.total_fft_convs,
+                ["Obj buffer reads"] + self.total_obj_reads,
+                ["Obj buffer writes"] + self.total_obj_writes,
+                ["Kern buffer reads"] + self.total_kern_reads,
                 ["MS utilization"] + self.layerwise_MS_util,
                 ["Scaled MS utilization"] + scaled_util,
                 ["OP"] + self.total_ops,

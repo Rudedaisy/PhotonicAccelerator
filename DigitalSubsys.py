@@ -22,11 +22,17 @@ class DigitalSubsys:
 
         # Stats of one DAC
         self.DAC_latency = float(self.config.get("digital", "DAC_latency"))
-        self.DAC_avgPower = float(self.config.get("digital", "DAC_avgPower"))
+        if int(self.config.get("general", "en_DAC")):
+            self.DAC_avgPower = float(self.config.get("digital", "DAC_avgPower"))
+        else:
+            self.DAC_avgPower = 0
         self.DAC_area = float(self.config.get("digital", "DAC_area"))
         # Stats of one ADC
         self.ADC_latency = float(self.config.get("digital", "ADC_latency"))
-        self.ADC_avgPower = float(self.config.get("digital", "ADC_avgPower"))
+        if int(self.config.get("general", "en_ADC")):
+            self.ADC_avgPower = float(self.config.get("digital", "ADC_avgPower"))
+        else:
+            self.ADC_avgPower = 0
         self.ADC_area = float(self.config.get("digital", "ADC_area"))
 
         # Stats of DAC row
@@ -39,15 +45,24 @@ class DigitalSubsys:
         self.ADCrow_area = self.ADC_area * (MS_dim / ADC_group_size)
         # Stats of total bit-line selector
         self.bls_latency = float(self.config.get("digital", "bls_latency"))
-        self.bls_avgPower = float(self.config.get("digital", "bls_avgPower"))
+        if int(self.config.get("general", "en_bls")):
+            self.bls_avgPower = float(self.config.get("digital", "bls_avgPower"))
+        else:
+            self.bls_avgPower = 0
         self.bls_area = float(self.config.get("digital", "bls_area"))
         # Stats of normalization, maxpool, and activation module
         self.nonlinear_latency = float(self.config.get("digital", "nonlin_latency"))
-        self.nonlinear_avgPower = float(self.config.get("digital", "nonlin_avgPower"))
+        if int(self.config.get("general", "en_nonlinear")):
+            self.nonlinear_avgPower = float(self.config.get("digital", "nonlin_avgPower"))
+        else:
+            self.nonlinear_avgPower = 0
         self.nonlinear_area = float(self.config.get("digital", "nonlin_area"))
         # Stats of global control circuitry
         self.control_latency = float(self.config.get("digital", "control_latency"))
-        self.control_avgPower = float(self.config.get("digital", "control_avgPower"))
+        if int(self.config.get("general", "en_control")):
+            self.control_avgPower = float(self.config.get("digital", "control_avgPower"))
+        else:
+            self.control_avgPower = 0
         self.control_area = float(self.config.get("digital", "control_area"))
 
         # -------- Summary of DiginalSubsys ------------ #

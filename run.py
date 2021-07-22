@@ -30,8 +30,9 @@ def main():
     layer_name, in_obj_size, out_obj_size, in_channels, out_channels, kernel_size, stride = read_config(model_cfg, skip_resid)
 
     for layer_idx in range(len(layer_name)):
-        print()
-        print("Processing layer: {}".format(layer_name[layer_idx]))
+        if int(config.get("simulation", "dump_layerwise")):
+            print()
+            print("Processing layer: {}".format(layer_name[layer_idx]))
 
         # configure accelerator with current layer dimensions
         acc.load_layer(in_obj_size[layer_idx], out_obj_size[layer_idx], in_channels[layer_idx], out_channels[layer_idx], kernel_size[layer_idx], stride[layer_idx])
@@ -43,7 +44,8 @@ def main():
             acc.apply_latch()
             acc.update_state()
             cycle += 1
-        print("Cycle count = {}".format(cycle))
+        if int(config.get("simulation", "dump_layerwise")):
+            print("Cycle count = {}".format(cycle))
 
     print()
     cycles = acc.summary()

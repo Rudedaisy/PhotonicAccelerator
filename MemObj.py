@@ -60,6 +60,9 @@ class MemObj:
 
         leakage_scale = float(self.config.get("memory", "leakage_scale"))
         self.static_power = self.static_power * leakage_scale
+
+        if not int(self.config.get("general", "en_buffs")):
+            self.read_energy = self.write_energy = self.static_power = 0
         
         #print(self.latency, self.read_energy, self.write_energy, self.static_power, self.area)
 
