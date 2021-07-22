@@ -2,8 +2,8 @@
 # Author:  Edward Hanson (edward.t.hanson@duke.edu)
 # Desc.    Generate YOLOv3 (Darknet-53) config file
 
-startingH = 1254 #1225 #256
-startingW = 1254 #1225 #256
+startingH = 1024 #1225 #256
+startingW = 1024 #1225 #256
 
 def appendToFile(fp, name, H, W, KH, KW, IC, OC, stride):
     fp.write(str(name)+",\t" + str(H)+",\t" + str(W)+",\t" + str(KH)+",\t" + str(KW)+",\t" + str(IC)+",\t" + str(OC)+",\t" + str(stride)+",\n")

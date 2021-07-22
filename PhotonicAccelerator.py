@@ -81,15 +81,29 @@ class PhotonicAccelerator:
         # Determine critical path latency
         if int(self.config.get("general", "cp_override")):
             self.critical_path_latency = float(self.config.get("general", "critical_path"))
+            print("Critical path overriden to {}".format(float(self.config.get("general", "critical_path"))))
         elif int(self.config.get("general", "FIFO")):
             self.critical_path_latency = max(self.photonic.t,
                                              self.digital.latency)
+            if self.photonic.t > self.digital.latency:
+                print("Critical path restricted to {} due to photonic subsystem".format(self.photonic.t))
+            else:
+                print("Critical path restricted to {} due to digital subsystem".format(self.digital.latency))
+                print("ADC: {}, DAC: {}".format(self.digital.ADCrow_latency, self.digital.DACrow_latency))
         else:
             self.critical_path_latency = max(self.photonic.t,
                                              self.digital.latency,
                                              self.kernel_buffer.latency*self.MS_pix/self.mem_access_width/self.banks,
                                              self.object_buffer.latency*self.MS_pix/self.mem_access_width/self.banks)
-        print("Critical path = {}".format(self.critical_path_latency))
+            if self.critical_path_latency == self.photonic.t:
+                print("Critical path restricted to {} due to photonic subsystem".format(self.photonic.t))
+            elif self.critical_path_latency == self.digital.latency:
+                print("Critical path restricted to {} due to digital subsystem".format(self.digital.latency))
+            elif self.critical_path_latency == self.kernel_buffer.latency*self.MS_pix/self.mem_access_width/self.banks:
+                print("Critical path restricted to {} due to kernel buffer (influenced by MS size)".format(self.kernel_buffer.latency*self.MS_pix/self.mem_access_width/self.banks))
+            else:
+                print("Critical path restricted to {} due to object buffer (incluenced by MS size)".format(self.object_buffer.latency*self.MS_pix/self.mem_access_width/self.banks))
+        #print("Critical path = {}".format(self.critical_path_latency))
         
         # Lifetime summary variables
         self.total_latency = []

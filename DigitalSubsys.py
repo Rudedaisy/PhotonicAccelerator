@@ -51,7 +51,7 @@ class DigitalSubsys:
         self.control_area = float(self.config.get("digital", "control_area"))
 
         # -------- Summary of DiginalSubsys ------------ #
-        self.latency = max([self.DACrow_latency + 2*self.ADCrow_latency, self.bls_latency, self.nonlinear_latency, self.control_latency])
+        self.latency = max([self.DACrow_latency + self.ADCrow_latency, self.bls_latency, self.nonlinear_latency, self.control_latency])
         self.avgPower = self.DACrow_avgPower + self.ADCrow_avgPower + self.bls_avgPower + self.nonlinear_avgPower + self.control_avgPower
         self.area = self.DACrow_area + self.ADCrow_area + self.bls_area + self.nonlinear_area + self.control_area
 
