@@ -41,7 +41,7 @@ class MemObj:
         # Read cacti stats file and import key stats
         fin = open(os.path.join(cwd, "out", memstats_fname), 'r')
         for line in fin:
-            if self.latency==None and "Access time (ns):" in line:
+            if self.latency==None and "Cycle time (ns):" in line:
                 self.latency = float(line.split(':')[1].strip()) * 1e-9
             elif self.read_energy==None and (("Total dynamic read energy per access (nJ):" in line) or ("Read Energy (nJ):" in line)):
                 self.read_energy = float(line.split(':')[1].strip()) * 1e-9
